@@ -1,0 +1,26 @@
+version: '2'
+services:
+  postgres:
+    image: debezium/postgres
+    ports:
+     - 5432:5432
+    environment:
+     - POSTGRES_PASSWORD=postgres
+  oracle:
+    image: oracleinanutshell/oracle-xe-11g
+    ports:
+     - 1521:1521
+  connect:
+    image: debezium/connect:1.2
+    ports:
+     - 8084:8083
+     - 9012:9012
+    links:
+     - postgres
+     - oracle
+    environment:
+     - BOOTSTRAP_SERVERS=172.31.42.150:9092
+     - GROUP_ID=1
+     - CONFIG_STORAGE_TOPIC=my_connect_configs
+     - OFFSET_STORAGE_TOPIC=my_connect_offsets
+     - STATUS_STORAGE_TOPIC=my_source_connect_statuses

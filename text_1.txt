@@ -1,0 +1,56 @@
+cdc1
+	inbox
+		문제 해결 진행
+			1. 사이트에서 찾은 설정으로 연결 시도해보기 
+		erro 발생 문제 해결 필요 
+			[root@ip-172-31-42-150 kafka-connect-hdfs]# confluent local services connect connector load hdfs-sink --config ./test.properties
+The local commands are intended for a single-node development environment only,
+NOT for production usage. https://docs.confluent.io/current/cli/index.html
+
+{
+  "error_code": 400,
+  "message": "Connector configuration is invalid and contains the following 2 error(s):\nMissing required configuration \"transforms.unwrapkey.type\" which has no default value.\nInvalid value null for configuration transforms.unwrapkey.type: Not a Transformation\nYou can also find the above list of errors at the endpoint `/connector-plugins/{connectorType}/config/validate`"
+}
+		참고 사항
+			confluent 플러그인 내용 확인 가능
+				confluent local services connect plugin list
+			confluent java plug-in path 
+				/usr/share/java/kafka
+			core 파일 복사 
+				/root/confluent-6.2.0/etc/kafka-connect-hdfs/debezium-core.tar
+					/root/confluent-6.2.0/share/java/plugins/debezium-connector-postgres
+				하위 토픽 2
+	자주 사용하는 명령어 
+		소스 투 카프카 
+			curl -H 'Accept:application/json' localhost:8083/connectors
+			curl -H 'Accept:application/json' localhost:8084/connectors
+			docker exec -u postgres -it docker-compose_postgres_1 bash -c "psql postgres postgres"
+			kafka-console-consumer --bootstrap-server localhost:9092 --topic dumb_table --from-beginning
+			docker inspect docker-compose_connect_1 | grep 172
+			docker logs -f docker-compose_connect_1
+		hdfs sink 
+			confluent local services connect connector load hdfs-sink --config ./test.properties
+			confluent local services connect plugin list
+			curl -H 'Accept:application/json' localhost:8083/connector-plugins
+			curl -X PUT -H 'Accept:application/json' localhost:8083/connector-plugins/io.debezium.connector.postgresql.PostgresConnector/config/validate
+		confluent 를 이용한 연결 schema registry server 를 활용
+			confluent local services start
+			confluent local services stop
+			confluent local destroy
+			curl -i -X DELETE -H 'Content-Type:application/json' localhost:8084/connectors/inventory-connector
+			kafka-topics --list --zookeeper localhost:2181
+			kafka-topics --delete --zookeeper localhost:2181 --topic dumb_table
+			confluent local services connect connector load hdfs-sink --config dumb-table-quickstart.properties
+	해결 방법 
+		confluent source postgres 이용해서 진행
+			공식 문서에서 confluent 플랫폼을 위한 postgres Sorce connector 로 토픽을 생성하고 연동 시도를 해본다. 기존 옵션을 무시한다. 
+				공식 문서 내에서 답을 찾는다. 
+				하위 토픽 2
+			방법 2 컨플루언트의  아브로 타입을 맞춰서 토픽을 생성하고 뒷단을 연결해본다. 그후 앞단것을 이용해서 기존 디비지움에 적용해서 해본다. 
+		커넥트 호환성 문제 
+		avro를 사용해야 하는 상황
+			소스에서 타켓으로 보낼 때 아브로 타입으로 해야 하둡으로 보낼 수 있다. 
+				해당 내용은 카프카 책을 이용해서 소스와 타겟쪽 개발 하는 부분 파악 필요. 
+		안되면 우선 엔터프라이즈 버전 이용해서 조작 진행 해보기 
+		문제 해결 
+			기존 confluent 환경에 아브로 타입을 이용해서 debezium 

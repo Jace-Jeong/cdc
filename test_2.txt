@@ -1,0 +1,115 @@
+cdc2
+	작업 순서
+		git 설치 
+			yum install -y git
+		docker 설치 
+			참고 URL : https://docs.aws.amazon.com/AmazonECS/latest/developerguide/docker-basics.html
+			sudo yum update -y
+			docker 설치 
+				sudo amazon-linux-extras install docker
+				sudo yum install docker
+			sudo service docker start
+			sudo usermod -a -G docker ec2-user
+			docker info
+		docker-compose 설치 
+			참고 URL : https://gist.github.com/npearce/6f3c7826c7499587f00957fee62f8ee9
+			sudo curl -L https://github.com/docker/compose/releases/download/1.22.0/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose
+			sudo chmod +x /usr/local/bin/docker-compose
+			docker-compose version
+		confluent local 설치 
+			confluent downlaod link
+				https://packages.confluent.io/archive/6.2/confluent-6.2.1.tar.gz?_ga=2.232325981.370540916.1632876409-183656297.1591856203&_gac=1.127319423.1632635677.Cj0KCQjwkbuKBhDRARIsAALysV6AcKQiMTj5RkaM3SAylGfK-yX4_G09LNOyo26eH0uOh0HwpN4048AaAp8UEALw_wcB
+			java 설치 
+				해당 부분은 설치 되어 있을 수 있음. 
+				참고 주소 : https://gaemi606.tistory.com/entry/AWS-EC2%EC%97%90-JAVA%EC%84%A4%EC%B9%98-%EB%B0%8F-%ED%99%98%EA%B2%BD%EB%B3%80%EC%88%98-%EC%84%A4%EC%A0%95
+				yum list | grep jdk
+				yum install -y java-1.8.0-openjdk.x86_64
+			confluent 설치 
+				참고 주소 : https://docs.confluent.io/platform/current/quickstart/ce-quickstart.html?_ga=2.238232514.370540916.1632876409-183656297.1591856203&_gac=1.82122084.1632635677.Cj0KCQjwkbuKBhDRARIsAALysV6AcKQiMTj5RkaM3SAylGfK-yX4_G09LNOyo26eH0uOh0HwpN4048AaAp8UEALw_wcB
+		hadoop 설치 
+			https://github.com/big-data-europe/docker-hadoop.git
+			docker-compose up -d
+		confluent flug in 설치 
+			hdfs connect
+				참고 url : https://docs.confluent.io/kafka-connect-hdfs/current/overview.html
+				confluent-hub install confluentinc/kafka-connect-hdfs:latest
+			debezium 설치 
+				참고 url : https://docs.confluent.io/debezium-connect-postgres-source/current/overview.html
+				confluent-hub install debezium/debezium-connector-postgresql:latest
+			연결 테스트
+				  ./bin/kafka-avro-console-producer --broker-list localhost:9092 --topic test_hdfs --property value.schema='{"type":"record","name":"myrecord","fields":[{"name":"f1","type":"string"}]}'
+				{"f1": "value1"}
+{"f1": "value2"}
+{"f1": "value3"}
+			connect 연결 정보 파일 만들기 
+				etc/kafka-connect-hdfs/quickstart-hdfs.properties
+				name=hdfs-sink
+connector.class=io.confluent.connect.hdfs.HdfsSinkConnector
+tasks.max=1
+topics=test_hdfs
+hdfs.url=hdfs://localhost:9000
+flush.size=3
+			재기동
+				confluent local services stop
+				confluent local services start
+				confluent local services connect plugin list
+			연결 
+				confluent local services connect connector load hdfs-sink --config ./etc/kafka-connect-hdfs/quickstart-hdfs.properties
+			수신 내용 확인
+				kafka-console-consumer --bootstrap-server localhost:9092 --topic test_hdfs --from-beginning
+			hadoop 데이터 확인
+		hadoop 에서 데이터 확인
+			docker exec -it namenode bash
+			hadoop fs -ls /topics/test_hdfs/partition=0
+		소스쪽 컨테이너 설치 
+			docker-compose 활용
+		dumb table 생성
+			create database inventory;
+\c inventory
+CREATE TABLE dumb_table(id SERIAL PRIMARY KEY, name VARCHAR);
+insert into dumb_table (select 1,1);
+		connect 연결 테스트 
+			docker inspect test_postgres_1 | grep 172
+			jq 설치 
+				yum install -y jq
+		hadoop dumb 테이블 연결
+			name=dumb-hdfs-sink
+connector.class=io.confluent.connect.hdfs.HdfsSinkConnector
+tasks.max=1
+topics=dumb_table
+hdfs.url=hdfs://localhost:9000
+flush.size=3
+			confluent local services connect connector load dumb-hdfs-sink --config ./etc/kafka-connect-hdfs/dumb.properties
+		hdfs 데이터 들어가는지 확인 필요
+			hadoop fs -ls /topics
+	파일 내용
+		docker-compose 
+			hadoop
+		github 내용
+			소스쪽 컨테이너 
+				version: '2'
+services:
+  postgres:
+    image: debezium/postgres
+    ports:
+     - 5432:5432
+    environment:
+     - POSTGRES_PASSWORD=postgres
+  oracle:
+    image: oracleinanutshell/oracle-xe-11g
+    ports:
+     - 1521:1521
+  connect:
+    image: debezium/connect:1.2
+    ports:
+     - 8084:8083
+     - 9012:9012
+    links:
+     - postgres
+     - oracle
+    environment:
+     - BOOTSTRAP_SERVERS=172.31.42.150:9092
+     - GROUP_ID=1
+     - CONFIG_STORAGE_TOPIC=my_connect_configs
+     - OFFSET_STORAGE_TOPIC=my_connect_offsets
+     - STATUS_STORAGE_TOPIC=my_source_connect_statuses
